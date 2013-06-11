@@ -36,50 +36,36 @@ int prepare_multi_socket(){
   return 0;
 }
 
-int main()
-{
-  int s[SOCK_MAX + 1];
-  int n = 0;
-  int len;
-  fd_set readfds;
-  int cllen;
-  struct sockaddr_in saddr;
-  struct sockaddr_in caddr;
-  char str[1024], buf[1024];
-  int i, j;
-  int msglen;
-
-  prepare_multi_socket();
-
-  // TCP　待ちうけようソケットを作成
+int make_socket(int s[]){
+  // TCP 待ちうけようソケットを作成
   if ((s[0] = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     perror("socket");
     exit(1);
   }
+}
 
-  // Client用ソケットを未使用に初期化
-  for(i = 1; i < SOCK_MAX + 1; i++) {
-    s[i] = UNUSED;
-  }
+int do_bind(struct sockaddr_in *saddr, int s[]){
+  // bind用データ設定
+  memset(saddr, 0, sizeof (*saddr) );
 
-//  bzero((char *)&saddr, sizeof(saddr));
-  memset(&saddr, 0, sizeof saddr);
+  saddr->sin_family = AF_INET;
+  saddr->sin_addr.s_addr = INADDR_ANY;
+  saddr->sin_port = htons(PORT);
 
-  saddr.sin_family = AF_INET;
-  saddr.sin_addr.s_addr = INADDR_ANY;
-  saddr.sin_port = htons(PORT);
-
-  if ((bind(s[0], (struct sockaddr *)&saddr, sizeof(saddr))) == -1) {
+  if ((bind(s[0], (struct sockaddr *)saddr, sizeof(*saddr))) == -1) {
     perror("bind");
     exit(1);
   }
+}
 
+int do_listen(int s[]){
   if ((listen(s[0], SOCK_MAX)) == -1) {
     perror("listen");
     exit(1);
-  } 
+  }
+}
 
-  // epoll struct epoll_event を設定
+int set_multi_read(int s[]){
   memset(&event, 0, sizeof event);
   event.data.fd = s[0];
   event.events = EPOLLIN;
@@ -88,7 +74,30 @@ int main()
   if(ret){
     perror("epoll_ctl");
   }
+}
 
+int main()
+{
+  int s[SOCK_MAX + 1];
+  int n = 0;
+  int len;
+  fd_set readfds;
+  int cllen;
+  struct sockaddr_in saddr, caddr;
+  char str[1024], buf[1024];
+  int i, j, msglen;
+
+  
+  prepare_multi_socket();
+
+  make_socket(s);
+
+  do_bind(&saddr, s);
+
+  do_listen(s);
+
+  set_multi_read(s);
+  
   struct epoll_event *events;
   int nr_events;
   char buffer[1024];
@@ -108,6 +117,7 @@ int main()
 
     for(i=0; i< nr_events; i++){
       if(events[i].data.fd == s[0]){
+        // listenしているsocket処理
         struct sockaddr_in client_addr;
         socklen_t client_addr_len = sizeof client_addr;
 
@@ -129,6 +139,7 @@ int main()
         epoll_ctl(epfd_client, EPOLL_CTL_ADD, client, &ev_write);
 
       }else{
+        // clientとつながっているsocket処理
         int client = events[i].data.fd;
         int n = read(client, buffer, sizeof buffer);
         if (n < 0) {

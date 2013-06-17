@@ -19,7 +19,8 @@ int main (int argc, char **argv)
 {
 char *buf;
 int bufsiz;
-int sd, len, err;
+int sd, err;
+socklen_t len;
 int sndbufsiz, used;
 int count = 0;
 int i;

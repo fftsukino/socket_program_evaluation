@@ -23,7 +23,8 @@ int rd;
 
 void stats()
 {
-int len, err;
+int err;
+socklen_t len;
 int rcvbufsiz, used;
 
 len = sizeof(rcvbufsiz);

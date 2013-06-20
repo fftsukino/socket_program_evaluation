@@ -40,8 +40,8 @@ void stats()
         exit(1);
     }
 
-    printf("Read buffer is %d bytes, with %d bytes used.\n",
-            rcvbufsiz, used);
+    printf("Read buffer is %d bytes, with %d bytes used, %d byes availe\n",
+            rcvbufsiz, used, rcvbufsiz - used);
 }
 
 
@@ -79,20 +79,19 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    while(1) {
-        printf("waiting on port %d...\n", PORT);
+    printf("waiting on port %d...\n", PORT);
 
-        rd = accept(sd, NULL, NULL);
-        if(rd < 0) {
-            perror("accept");
-            exit(1);
-        }
+    rd = accept(sd, NULL, NULL);
+    if(rd < 0) {
+        perror("accept");
+        exit(1);
+    }
+    signal(SIGINT, sigint);
+
+    while(1) {
 
         stats();
-        signal(SIGINT, sigint);
+        sleep(1);
 
-        for(;;) {
-            sleep(1);
-        }
     }
 }

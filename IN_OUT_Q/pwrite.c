@@ -9,7 +9,7 @@
 #include <netdb.h>
 #include <sys/ioctl.h>
 #include <linux/sockios.h>
-
+#include <errno.h>  
 
 #define HOST "127.0.0.1"
 #define PORT 1111
@@ -18,13 +18,15 @@
 int main (int argc, char **argv)
 {
     char *buf;
+    char *r_buf;
     int bufsiz;
     int sd, err;
-    socklen_t len;
-    int sndbufsiz, used;
-    int count = 0;
+    socklen_t len, r_len;
+    int sndbufsiz, used, rcvbufsiz, r_used;
+    int count = 0, r_count = 0;
     int i;
     struct sockaddr_in sa;
+    int val;
 
     if(argc == 2) {
         bufsiz = atoi(argv[1]);
@@ -33,6 +35,7 @@ int main (int argc, char **argv)
     }
     printf("Allocating %d bytes for write buffer.\n", bufsiz);
     buf = malloc(bufsiz);
+    r_buf = malloc(bufsiz);
     if(!buf) {
         perror("malloc");
         exit(1);
@@ -55,6 +58,10 @@ int main (int argc, char **argv)
         exit(1);
     }
 
+    // set nonblocking
+    //val = 1;
+    //ioctl(sd, FIONBIO, &val);
+
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(PORT);
@@ -69,6 +76,13 @@ int main (int argc, char **argv)
         exit(1);
     }
 
+    // set nonblocking
+    val = 1;
+    ioctl(sd, FIONBIO, &val);
+
+    //
+    printf("NO\tSO_SNDBU\tSIOCOUTQ\tsnd_avail\tSO_RCVBUF\tSOICINQ\trcv_avail\n");
+
     // give the read socket time to collect buffer sizes
     // start hitting it with data.
     sleep(1);
@@ -77,7 +91,13 @@ int main (int argc, char **argv)
         len = sizeof(sndbufsiz);
         err = getsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sndbufsiz, &len);
         if(err < 0) {
-            perror("getsockopt");
+            perror("getsockopt write");
+            exit(1);
+        }
+        r_len = sizeof(rcvbufsiz);
+        err = getsockopt(sd, SOL_SOCKET, SO_RCVBUF, &rcvbufsiz, &r_len);
+        if(err <0){
+            perror("getsockopt read");
             exit(1);
         }
 
@@ -87,17 +107,40 @@ int main (int argc, char **argv)
             exit(1);
         }
 
-        len = write(sd, buf, bufsiz);
-        if(len < 0) {
-            perror("write");
+        err = ioctl(sd, SIOCINQ, &r_used);
+        if(err < 0){
+            perror("ioctl SIOCINQ");
+            exit(1);
         }
-        if(len <= 0) {
+
+        len = write(sd, buf, bufsiz);
+        if((int)len < 0) {
+            perror("write");
             exit(0);
+        }
+        if((int)len <= 0) {
+            exit(0);
+        }
+        r_len = read(sd, r_buf, bufsiz);
+        if ((int)r_len < 1){
+            if (errno == EAGAIN){
+                r_len = 0;
+            }else{
+                perror("read");
+                exit(1);
+            }
+        }else{
+            // 読み込む用
+            printf("%2d \n", r_len);
         }
 
         count += len;
-        printf("%2i: SO_SNDBUF=%6d, SIOCOUTQ=%6d: %6d avail. Wrote %d bytes, %d total.\n",
-                i, sndbufsiz, used, sndbufsiz - used, len, count);
+        //printf("%2i: SO_SNDBUF=%6d, SIOCOUTQ=%6d: %6d avail. Wrote %d bytes, %d total.\n",
+        //        i, sndbufsiz, used, sndbufsiz - used, len, count);
+        r_count += r_len;
+        //printf("%2i: SO_RCVBUF=%6d, SIOCINQ =%6d: %6d avail. Red   %d bytes, %d total.\n",
+        //        i, rcvbufsiz, r_used, rcvbufsiz - r_used, r_len, r_count);
+        printf("%2i\t%6d\t%6d\t%6d\t%6d\t%6d\t%6d\n", i, sndbufsiz, used, sndbufsiz -used, rcvbufsiz, r_used, rcvbufsiz - r_used);
 
         sleep(1);
     }

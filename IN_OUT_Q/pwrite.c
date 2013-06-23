@@ -19,7 +19,7 @@ int main (int argc, char **argv)
 {
     char *buf;
     char *r_buf;
-    int bufsiz;
+    int bufsiz = BUFSIZ;
     int sd, err;
     socklen_t len, r_len;
     int sndbufsiz, used, rcvbufsiz, r_used;
@@ -27,12 +27,36 @@ int main (int argc, char **argv)
     int i;
     struct sockaddr_in sa;
     int val;
+    // for getopt
+    int port = PORT;
+    char *end_ptr;
+    int ret_opt;
 
-    if(argc == 2) {
-        bufsiz = atoi(argv[1]);
-    } else {
-        bufsiz = BUFSIZ;
+    while((ret_opt=getopt(argc, argv, "p:b:")) != -1){
+        switch(ret_opt){
+            case 'b':
+                bufsiz = strtol(optarg, &end_ptr, 10);
+                break;
+            case 'p':
+                port = strtol(optarg, &end_ptr, 10);
+                break;
+            case ':':
+                fprintf(stdout, "%c needs value\n", ret_opt);
+                break;
+            case '?':
+                fprintf(stdout, "unknown options\n");
+                break;
+        }
+        for(;optind<argc;optind++){
+            fprintf(stdout, "not option arg %s\n", argv[optind]);
+        }
     }
+
+//    if(argc == 2) {
+//        bufsiz = atoi(argv[1]);
+//    } else {
+//        bufsiz = BUFSIZ;
+//    }
     printf("Allocating %d bytes for write buffer.\n", bufsiz);
     buf = malloc(bufsiz);
     r_buf = malloc(bufsiz);
@@ -64,7 +88,7 @@ int main (int argc, char **argv)
 
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
-    sa.sin_port = htons(PORT);
+    sa.sin_port = htons(port);
     if(!inet_aton(HOST, &sa.sin_addr)) {
         printf("bad address\n");
         exit(1);

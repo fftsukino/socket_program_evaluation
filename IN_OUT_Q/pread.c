@@ -56,6 +56,28 @@ int main(int argc, char **argv)
 {
     int sd, err;
     struct sockaddr_in addr;
+    int port = PORT;
+    char *end_ptr;
+
+    int ret_opt;
+    while((ret_opt=getopt(argc, argv, "p:")) != -1){
+        switch(ret_opt){
+        case 'p':
+//            fprintf(stdout, "port:%s", optarg);
+            port = strtol(optarg, &end_ptr, 10);
+            break;
+        case ':':
+            fprintf(stdout, "%c needs value\n", ret_opt);
+            break;
+        case '?':
+            fprintf(stdout, "unknown options\n");
+            break;
+        }
+        for(;optind<argc;optind++){
+            fprintf(stdout, "not option arg %s\n", argv[optind]);
+        }
+    }
+
 
     sd = socket(AF_INET, SOCK_STREAM, 0);
     if(sd<0) {
@@ -65,7 +87,7 @@ int main(int argc, char **argv)
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(PORT);
+    addr.sin_port = htons(port);
 
     err = bind(sd, (struct sockaddr*)&addr, sizeof(addr));
     if(err < 0) {
@@ -79,7 +101,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    printf("waiting on port %d...\n", PORT);
+    printf("waiting on port %d...\n", port);
 
     rd = accept(sd, NULL, NULL);
     if(rd < 0) {
